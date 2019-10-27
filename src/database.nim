@@ -61,13 +61,43 @@ proc findMessage*(database: Database, usernames: seq[string], limit = 10): seq[M
     var whereClause = " WHERE "
     for i in 0 ..< usernames.len:
         whereClause.add("username = ? ")
-        if i != usernames.len:
+        if i != 0:
             whereClause.add("or ")
 
     let messages = database.db.getAllRows(
             sql("SELECT username, time, msg FROM Message" & whereClause &
-                    "ORDER BY time  DESC LIMIT" & $limit), usernames)
+                    "ORDER BY time DESC LIMIT " & $limit), usernames)
 
     for row in messages:
         result.add(Message(username: row[0], time: fromUnix(row[1].parseInt),
                 msg: row[2]))
+
+proc close*(database: Database) =
+    database.db.close()
+
+proc setup*(database:Database)=
+
+    database.db.exec(sql"""
+    CREATE TABLE IF NOT EXISTS User(
+        username text PRIMARY KEY
+    );
+    """)
+
+    database.db.exec(sql"""
+    CREATE TABLE IF NOT EXISTS Following(
+        follower text,
+        followed_user text,
+        PRIMARY KEY (follower, followed_user)
+        FOREIGN KEY (follower) REFERENCES User(username),
+        FOREIGN KEY (followed_user) REFERENCES User(username)
+    );
+    """)
+
+    database.db.exec(sql"""
+    CREATE TABLE IF NOT EXISTS Message(
+        username text,
+        time integer,
+        msg text NOT NULL,
+        FOREIGN KEY (username) REFERENCES User(username)
+    );
+    """)
